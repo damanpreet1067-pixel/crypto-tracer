@@ -3,7 +3,15 @@
 A blockchain forensics dashboard. Trace a wallet across Ethereum, BSC, Bitcoin and
 Tron, see the money flow as a graph, get an explainable risk assessment, and export
 evidence files that can be verified with SHA-256 hashes.
+## Screenshots
 
+![Login page](docs/login.png)
+
+![Dashboard with risk score and clusters](docs/dashboard.png)
+
+![Money-flow graph](docs/graph.png)
+
+![Evidence page with SHA-256 hash log](docs/evidence.png)
 ## Features
 - Login and register (bcrypt-hashed passwords), with per-user cases
 - Four chains: Ethereum, BSC, Bitcoin, Tron
