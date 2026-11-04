@@ -1,0 +1,14 @@
+ {
+  "0x28C6c06298d514Db089934071355E5743bf21d60": {"name": "Binance 14", "category": "exchange"},
+  "0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8": {"name": "Binance 7", "category": "exchange"},
+  "0xF977814e90dA44bFA03b6295A0616a897441aceC": {"name": "Binance 8", "category": "exchange"},
+  "0x71660c4005BA85c37ccec55d0C4493E66Fe775d3": {"name": "Coinbase 1", "category": "exchange"},
+  "0x267be1C1D684F78cb4F6a176C4911b741E4Ffdc0": {"name": "Kraken 4", "category": "exchange"},
+  "0xd90e2f925DA726b50C4Ed8D0Fb90Ad053324F31b": {"name": "Tornado Cash Router", "category": "mixer"},
+  "0x12D66f87A04A9E220743712cE6d9bB1B5616B8Fc": {"name": "Tornado Cash 0.1 ETH", "category": "mixer"},
+  "0x47CE0C6eD5B0Ce3d3A51fdb1C52DC66a7c3c2936": {"name": "Tornado Cash 1 ETH", "category": "mixer"},
+  "0x910Cbd523D972eb0a6f4cAe4618aD62622b39DbF": {"name": "Tornado Cash 10 ETH", "category": "mixer"},
+  "0xA160cdAB225685dA1d56aa342Ad8841c3b53f291": {"name": "Tornado Cash 100 ETH", "category": "mixer"},
+    "34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo": {"name": "Binance cold wallet", "category": "exchange"},
+  "3D2oetdNuZUqQHPJmcMDDHYoqkyNVsFk9r": {"name": "Bitfinex cold wallet", "category": "exchange"}
+}

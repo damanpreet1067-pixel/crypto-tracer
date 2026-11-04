@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify evidence - Crypto Tracer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <div class="top">
+        <span><b class="brand">Crypto Tracer</b>
+            <a href="/dashboard">Dashboard</a><a href="/cases">My Cases</a><a href="/verify">Verify</a><a href="/trace">Wallet Trace</a></span>
+        <span>{{ username }}<a href="/logout">Logout</a></span>
+    </div>
+
+    <div class="content">
+        <h2>Verify an evidence file</h2>
+        <p class="muted">Upload a file you exported earlier. The tool recalculates its SHA-256 fingerprint
+            and compares it with the evidence log. If even one character changed, the fingerprint is completely different.</p>
+
+        <form method="POST" enctype="multipart/form-data" class="search">
+            <input type="file" name="file" required>
+            <button type="submit">Check file</button>
+        </form>
+
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+        {% if result %}
+            <div class="risk block" style="--c: {{ '#16a34a' if result.status == 'verified' else ('#dc2626' if result.status == 'modified' else '#d97706') }}">
+
+                {% if result.status == 'verified' %}
+                    <div class="verdict">&#10003; VERIFIED</div>
+                    <p>This file is exactly as it was exported. Its fingerprint matches the evidence log.</p>
+                    <p><b>Logged file:</b> {{ result.entry.filename }}<br>
+                       <b>Case:</b> {{ result.entry.case_name }}<br>
+                       <b>Exported (UTC):</b> {{ result.entry.created_utc }}</p>
+                    {% if result.uploaded_name != result.entry.filename %}
+                        <p class="hint">You uploaded it under the name "{{ result.uploaded_name }}", but its contents match the logged file.</p>
+                    {% endif %}
+
+                {% elif result.status == 'modified' %}
+                    <div class="verdict">&#10007; MODIFIED</div>
+                    <p>A file with this name was exported, but the contents are different now.
+                        It has been changed since export and should not be treated as the original evidence.</p>
+                    <p><b>Logged file:</b> {{ result.entry.filename }}<br>
+                       <b>Case:</b> {{ result.entry.case_name }}<br>
+                       <b>Exported (UTC):</b> {{ result.entry.created_utc }}</p>
+                    <p><b>Fingerprint in the log:</b><br><span class="mono">{{ result.entry.sha256 }}</span></p>
+
+                {% else %}
+                    <div class="verdict">? NOT IN THE LOG</div>
+                    <p>No file with this fingerprint or name exists in the evidence log of your cases. It may come from
+                        another user, may have been renamed, or may not be from this tool.</p>
+                {% endif %}
+
+                <p><b>Fingerprint of the uploaded file:</b><br><span class="mono">{{ result.sha256 }}</span></p>
+                <p class="hint">{{ result.size }} bytes</p>
+            </div>
+
+            {% if result.diff %}
+                <h3>What changed</h3>
+                {% if result.diff.available %}
+                    {% if result.diff.lines %}
+                        <div class="diffbox">
+                            {% for l in result.diff.lines %}
+                            <div class="dl {{ 'add' if l.startswith('+') else ('del' if l.startswith('-') else 'ctx') }}">{{ l }}</div>
+                            {% endfor %}
+                        </div>
+                        {% if result.diff.truncated %}<p class="hint">Showing the first 60 lines.</p>{% endif %}
+                    {% else %}
+                        <p class="hint">No visible text differences. Only invisible ones, such as line endings or encoding,
+                            changed, and those still change the fingerprint.</p>
+                    {% endif %}
+                {% else %}
+                    <p class="hint">{{ result.diff.reason }}</p>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    </div>
+</body>
+</html>

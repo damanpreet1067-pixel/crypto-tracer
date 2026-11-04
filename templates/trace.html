@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wallet Trace - Crypto Tracer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <div class="top">
+        <span><b class="brand">Crypto Tracer</b>
+            <a href="/dashboard">Dashboard</a><a href="/cases">My Cases</a><a href="/verify">Verify</a><a href="/trace">Wallet Trace</a></span>
+        <span>{{ username }}<a href="/logout">Logout</a></span>
+    </div>
+
+    <div class="content">
+        <h2>Wallet-to-wallet tracer</h2>
+        <p class="muted">Follow money from one wallet onward, hop by hop. Leave the destination empty to see
+            where the money went, or fill it in to check whether money flowed from one wallet to another.</p>
+
+        <form method="POST" action="/trace" class="tracebox"
+              onsubmit="var b=this.querySelector('button');b.textContent='Tracing, please wait...';b.disabled=true;">
+            <div class="row">
+                <select name="chain">
+                    {% for key, c in chains.items() %}
+                    <option value="{{ key }}" {{ 'selected' if key == form.chain else '' }}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+                <input class="grow" name="source" placeholder="Start wallet (where the money begins)"
+                       value="{{ form.source }}" required>
+            </div>
+            <div class="row">
+                <input class="grow" name="destination" placeholder="Destination wallet (optional)"
+                       value="{{ form.destination }}">
+            </div>
+            <div class="row">
+                <label>Hops</label>
+                <select name="hops">
+                    {% for n in range(1, max_hops + 1) %}
+                    <option value="{{ n }}" {{ 'selected' if form.hops|string == n|string else '' }}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+                <label>Wallets followed per hop</label>
+                <select name="breadth">
+                    {% for n in range(1, max_breadth + 1) %}
+                    <option value="{{ n }}" {{ 'selected' if form.breadth|string == n|string else '' }}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Trace the money</button>
+            </div>
+            <p class="hint">Money is followed in one token at a time, and a hop only counts if it happened after the
+                money arrived. A first trace can take a minute or two. Repeats are fast because wallets are saved.</p>
+        </form>
+
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+        {% if result %}
+            {% if result.source_note %}<div class="warnbox">{{ result.source_note }}</div>{% endif %}
+            {% if form.chain == 'bitcoin' %}
+                <div class="warnbox">Bitcoin note: a transaction with several senders is simplified to its first sender,
+                    so Bitcoin paths are approximate.</div>
+            {% endif %}
+            {% if result.stopped %}
+                <div class="warnbox">The trace stopped early because {{ result.stopped }}. Wallets already downloaded
+                    are saved, so running the same trace again continues from where it left off.</div>
+            {% endif %}
+            {% for err in result.errors %}
+                <div class="error" style="margin:8px 0;">Could not load {{ err.address[:10] }}...: {{ err.message }}</div>
+            {% endfor %}
+
+            <div class="stats">
+                <div class="stat"><b>{{ result.wallets_explored }}</b><span>wallets explored</span></div>
+                <div class="stat"><b>{{ result.edges|length }}</b><span>connections followed</span></div>
+                <div class="stat"><b>{{ result.api }} / {{ result.cache }}</b><span>from API / from cache</span></div>
+                <div class="stat"><b>{{ result.seconds }}s</b><span>time taken</span></div>
+            </div>
+
+            {% if result.no_outgoing %}
+                <div class="risk block" style="--c: #d97706">
+                    <h4>No outgoing transfers found</h4>
+                    <div class="muted">This wallet has no outgoing transfers with value in its recent history,
+                        so there is nothing to follow.</div>
+                </div>
+
+            {% elif result.destination %}
+                {% if result.paths %}
+                    <div class="risk block" style="--c: #16a34a">
+                        <div class="verdict">&#10003; PATH FOUND</div>
+                        <div>Money moved from <b>{{ result.paths[0][0].from_name }}</b> to
+                            <b>{{ result.paths[0][-1].to_name }}</b> in {{ result.paths[0]|length }} hop(s).</div>
+                    </div>
+                    {% for p in result.paths %}
+                        <h4>Path {{ loop.index }} ({{ p|length }} hop{{ 's' if p|length > 1 else '' }})</h4>
+                        <div class="hopchain">
+                            <span class="chip src" title="{{ result.source }}">{{ p[0].from_name }}</span>
+                            {% for e in p %}
+                                <span class="arrowbox" title="Last transfer: {{ e.last }} UTC">
+                                    <b>{{ e.amount_text }} {{ e.token }}{% if e.count > 1 %} x{{ e.count }}{% endif %}</b>
+                                    {{ e.first }} UTC<br><i>&#10132;</i></span>
+                                <span class="chip {{ 'dst' if loop.last else '' }}" title="{{ e.to }}">{{ e.to_name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="risk block" style="--c: #d97706">
+                        <div class="verdict">NO PATH FOUND</div>
+                        <div>No path from the start wallet to the destination was found within {{ result.hops }} hop(s),
+                            following {{ result.breadth }} wallet(s) per hop. This does not prove there is no
+                            connection: only the biggest receivers and the 50 newest records per wallet are examined.
+                            Try more hops or a wider search.</div>
+                    </div>
+                {% endif %}
+
+            {% else %}
+                <h3>Where the money went</h3>
+                {% if result.endpoints %}
+                    <div class="risk block" style="--c: #d97706">
+                        <h4>Reached an exchange or flagged service</h4>
+                        <ul class="routes">
+                            {% for x in result.endpoints %}
+                            <li><b>{{ x.name }}</b> ({{ x.category }}) at hop {{ x.hop }}, in {{ x.token }}<br>
+                                <span class="mono muted">{{ x.route }}</span></li>
+                            {% endfor %}
+                        </ul>
+                        <p class="hint">An exchange is where an identity can be requested through legal channels.
+                            A mixer is where the trail breaks.</p>
+                    </div>
+                {% else %}
+                    <p class="hint">No exchange or flagged service was reached within {{ result.hops }} hop(s).</p>
+                {% endif %}
+
+                {% if result.ends %}
+                    <div class="risk block" style="--c: #6366f1">
+                        <h4>The trail continues past the hop limit</h4>
+                        <ul class="routes">
+                            {% for x in result.ends[:15] %}
+                            <li><b>{{ x.name }}</b> received {{ x.total|round(4) }} {{ x.token }} (hop {{ x.hop }})<br>
+                                <span class="mono muted">{{ x.route }}</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                {% if result.stops %}
+                    <div class="risk block" style="--c: #64748b">
+                        <h4>The trail stops here</h4>
+                        <div class="muted">These wallets show no further outgoing transfers in the history that was
+                            fetched, so the money may still be sitting there.</div>
+                        <ul class="routes">
+                            {% for x in result.stops[:15] %}
+                            <li><b>{{ x.name }}</b> ({{ x.token }}), after hop {{ x.hop }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+            {% if result.edges %}
+                <div class="addcase">
+                    {% if cases %}
+                    <form method="POST" action="/trace/add">
+                        <b>Save to case:</b>
+                        <select name="case_id">
+                            {% for c in cases %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                        </select>
+                        <input type="hidden" name="chain" value="{{ form.chain }}">
+                        <input type="hidden" name="nodes" value='{{ result.save_nodes|tojson }}'>
+                        <button type="submit" class="btn-green">Add {{ result.save_nodes|length }} wallet(s) to the case</button>
+                    </form>
+                    {% else %}
+                        No cases yet. <a href="/cases">Create a case first</a>, then run the trace again.
+                    {% endif %}
+                </div>
+
+                <h3>Money flow, hop by hop</h3>
+                <div id="graph"></div>
+                <div class="legend">
+                    <div class="legend-row"><b>Wallets:</b>
+                        <span class="sw dot" style="background:#fb923c"></span>Start
+                        {% if result.destination %}<span class="sw dot" style="background:#22c55e"></span>Destination{% endif %}
+                        <span class="sw dot" style="background:#38bdf8"></span>Hop 1
+                        <span class="sw dot" style="background:#818cf8"></span>Hop 2
+                        <span class="sw dot" style="background:#c084fc"></span>Hop 3
+                        <span class="sw dot" style="background:#facc15"></span>Exchange
+                        <span class="sw dot" style="background:#ef4444"></span>Mixer
+                    </div>
+                    <div class="legend-row">Each arrow shows the amount and token. A thick green arrow marks a path that
+                        reached the destination. Wallets are arranged left to right by hop.</div>
+                </div>
+
+                <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+                <script>
+                    const data = {{ result.graph|tojson }};
+                    const network = new vis.Network(document.getElementById("graph"), {
+                        nodes: new vis.DataSet(data.nodes),
+                        edges: new vis.DataSet(data.edges)
+                    }, {
+                        layout: { hierarchical: { enabled: true, direction: "LR", sortMethod: "directed",
+                                                  levelSeparation: 230, nodeSpacing: 70 } },
+                        physics: false,
+                        nodes: { font: { color: "#1e293b" } },
+                        edges: { smooth: { type: "cubicBezier" },
+                                 font: { size: 10, strokeWidth: 3, strokeColor: "#ffffff" } }
+                    });
+                </script>
+
+                <h3>Transfers followed</h3>
+                <table>
+                    <tr><th>Hop</th><th>From</th><th>To</th><th>Token</th><th>Amount</th>
+                        <th>Transfers</th><th>First (UTC)</th><th>Last (UTC)</th></tr>
+                    {% for e in result.edges %}
+                    <tr>
+                        <td>{{ e.hop }}</td>
+                        <td class="addr" title="{{ e['from'] }}">{{ e.from_name }}</td>
+                        <td class="addr" title="{{ e.to }}">{{ e.to_name }}</td>
+                        <td><b>{{ e.token }}</b></td>
+                        <td>{{ e.amount_text }}</td>
+                        <td>{{ e.count }}</td>
+                        <td>{{ e.first }}</td>
+                        <td>{{ e.last }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+
+            <p class="hint" style="margin-top:20px;">Important: amounts are not matched from hop to hop. The tool shows that
+                money moved onward after it arrived, not that these exact coins were the ones forwarded. A path is a lead,
+                not proof of common ownership.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

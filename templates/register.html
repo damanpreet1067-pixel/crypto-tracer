@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register - Crypto Tracer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body class="auth">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+    <div class="auth-wrap">
+        <div class="auth-side">
+            <div class="mini-logo">&#9672; Crypto Tracer</div>
+            <span class="tagpill">Create your account</span>
+            <h1>Open cases. Build evidence.</h1>
+            <p>Save wallets into cases and export CSV, JSON and PDF reports, each with a hash.</p>
+            <div class="floatcards">
+                <div class="fc fc1"><small>Case</small><b>Saved</b><span>wallets + exchanges</span></div>
+                <div class="fc fc2"><small>Export</small><b>PDF</b><span>with hash log</span></div>
+                <div class="fc fc3"><small>Verify</small><b>&#10003;</b><span>file unchanged</span></div>
+            </div>
+            <div class="chainrow"><span>Ethereum</span><span>BSC</span><span>Bitcoin</span><span>Tron</span></div>
+        </div>
+        <div class="box">
+            <h2>Create account</h2>
+            <p class="muted">Username 3+ characters, password 6+</p>
+            {% for m in get_flashed_messages() %}<div class="msg">{{ m }}</div>{% endfor %}
+            <form method="POST">
+                <input name="username" placeholder="Username" required>
+                <input name="password" type="password" placeholder="Password" required>
+                <button type="submit">Create account &rarr;</button>
+            </form>
+            <p>Already registered? <a href="/login">Log in</a></p>
+        </div>
+    </div>
+</body>
+</html>

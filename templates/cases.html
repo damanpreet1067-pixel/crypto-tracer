@@ -1,0 +1,42 @@
+ <!DOCTYPE html>
+<html>
+<head>
+    <title>Cases - Crypto Tracer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <div class="top">
+        <span><b class="brand">Crypto Tracer</b>
+            <a href="/dashboard">Dashboard</a><a href="/cases">My Cases</a><a href="/verify">Verify</a><a href="/trace">Wallet Trace</a></span>
+        <span>{{ username }}<a href="/logout">Logout</a></span>
+    </div>
+
+    <div class="content">
+        <h2>My cases</h2>
+
+        {% for m in get_flashed_messages() %}<div class="msg">{{ m }}</div>{% endfor %}
+
+        <form method="POST" class="new">
+            <input name="name" placeholder="New case name, e.g. Phishing scam 2026" required>
+            <button type="submit">Create case</button>
+        </form>
+
+        {% if cases %}
+        <table>
+            <tr><th>Case</th><th>Nodes</th><th>Created (UTC)</th><th></th></tr>
+            {% for c in cases %}
+            <tr>
+                <td><b>{{ c.name }}</b></td>
+                <td>{{ c.node_count }}</td>
+                <td>{{ c.created_at }}</td>
+                <td><a href="/cases/{{ c.id }}">Open</a></td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+            <p class="muted">No cases yet. Create your first one above.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

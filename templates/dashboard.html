@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - Crypto Tracer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <div class="top">
+        <span><b class="brand">Crypto Tracer</b>
+            <a href="/dashboard">Dashboard</a><a href="/cases">My Cases</a><a href="/verify">Verify</a><a href="/trace">Wallet Trace</a></span>
+        <span>{{ username }}<a href="/logout">Logout</a></span>
+    </div>
+
+    <div class="content">
+        <div class="hero">
+            <h1>Follow the money.</h1>
+            <p>Paste a wallet address to see where funds came from, where they went, and whether anything looks suspicious.</p>
+            <span class="pill" style="--d:#627eea">Ethereum</span>
+            <span class="pill" style="--d:#f3ba2f">BSC</span>
+            <span class="pill" style="--d:#f7931a">Bitcoin</span>
+            <span class="pill" style="--d:#eb0029">Tron</span>
+        </div>
+
+        <form method="POST" action="/dashboard" class="search">
+            <select name="chain">
+                {% for key, c in chains.items() %}
+                <option value="{{ key }}" {{ 'selected' if key == chain else '' }}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <input name="address" placeholder="Paste a wallet address" value="{{ address }}" required>
+            <button type="submit">Trace</button>
+            <button type="submit" name="refresh" value="1" class="btn-amber">Refresh from API</button>
+        </form>
+
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+        {% if source %}
+            <p>Found <b>{{ txs|length }}</b> transactions. Data came from:
+                <span class="badge {{ 'api' if source == 'API' else 'cache' }}">{{ source }}</span></p>
+        {% endif %}
+
+        {% if risk %}
+            <div class="risk" style="--c: {{ risk.color }}">
+                <div class="gauge" style="--p: {{ risk.score }}"><span>{{ risk.score }}</span></div>
+                <div>
+                    <h4>{{ risk.level }} risk <small>score out of 100</small></h4>
+                    <ul>{% for r in risk.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if behavior %}
+            <div class="risk" style="--c: {{ behavior.mixer_color }}">
+                <div class="bigword">{{ behavior.mixer_likelihood }}</div>
+                <div>
+                    <h4>Mixer likelihood</h4>
+                    {% if behavior.mixer_names %}
+                        <div class="muted">Known mixer contact: {{ behavior.mixer_names|join(', ') }}</div>
+                    {% endif %}
+                    <b>Behavior patterns</b>
+                    <span class="muted">({{ behavior.analyzed }} non-zero transactions analyzed)</span>
+                    {% if behavior.findings %}
+                        <ul>{% for f in behavior.findings %}<li><b>{{ f.name }}:</b> {{ f.detail }}</li>{% endfor %}</ul>
+                    {% else %}
+                        <div class="muted">No suspicious patterns found.</div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if clusters %}
+            <div class="risk block" style="--c: #84cc16">
+                <h4>Wallet clusters</h4>
+                {% if clusters.skipped %}
+                    <div class="muted">{{ clusters.skipped }}</div>
+                {% else %}
+                    {% if clusters.clusters %}
+                        {% for c in clusters.clusters %}
+                        <div style="margin-top:10px;">
+                            <span style="border:3px solid {{ c.color }}; padding:2px 10px; border-radius:20px;">Cluster C{{ c.id }}</span>
+                            {{ c.size }} wallets, {{ c.reason }}
+                            <div class="mono muted" style="margin-top:4px;">
+                                {% for m in c.members[:8] %}<span title="{{ m.address }}">{{ m.short }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+                                {% if c.members|length > 8 %} ... and {{ c.members|length - 8 }} more{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="muted">No clusters found.</div>
+                    {% endif %}
+                    {% if clusters.round_trip %}
+                        <div style="margin-top:10px;"><b>Round-trip wallets</b> (sent to and received from this wallet):
+                            <span class="mono muted">{% for m in clusters.round_trip[:8] %}<span title="{{ m.address }}">{{ m.short }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if graph %}
+            <div class="addcase">
+                {% if cases %}
+                <form method="POST" action="/cases/add">
+                    <b>Add to case:</b>
+                    <select name="case_id">{% for c in cases %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+                    <input name="note" placeholder="Note (optional)">
+                    <input type="hidden" name="address" value="{{ address }}">
+                    <input type="hidden" name="chain" value="{{ chain }}">
+                    <button type="submit" class="btn-green">Add wallet + exchange points</button>
+                </form>
+                {% else %}
+                    No cases yet. <a href="/cases">Create a case first</a>, then trace again.
+                {% endif %}
+            </div>
+
+            <h3>Money flow graph</h3>
+            <button type="button" class="btn-amber small" onclick="rearrange()">Re-arrange graph</button>
+            <div id="graph"></div>
+            <div class="legend">
+                <div class="legend-row"><b>Wallets (circles):</b>
+                    <span class="sw dot" style="background:#fb923c"></span>Searched wallet
+                    <span class="sw dot" style="background:#38bdf8"></span>Other wallet
+                    <span class="sw dot" style="background:#facc15"></span>Exchange
+                    <span class="sw dot" style="background:#ef4444"></span>Mixer
+                    <span class="sw dot" style="background:#991b1b"></span>Sanctioned
+                    <span class="sw dot" style="background:#ec4899"></span>Scam
+                </div>
+                <div class="legend-row"><b>Transactions (boxes, with amount and age):</b>
+                    <span class="sw sq" style="background:#475569"></span>ETH
+                    <span class="sw sq" style="background:#16a34a"></span>USDT
+                    <span class="sw sq" style="background:#7c3aed"></span>USDC
+                    <span class="sw sq" style="background:#d97706"></span>BTC
+                    <span class="sw sq" style="background:#0d9488"></span>TRX
+                    <span class="sw sq" style="background:#a16207"></span>BNB
+                </div>
+                <div class="legend-row"><b>Clusters:</b>
+                                <div class="legend-row"><b>Alerts:</b>
+                    <span style="color:#e11d48">&#9660;</span> A red downward triangle marks a lookalike address (possible poisoning).
+                </div>
+                    <span class="sw dot ring"></span>A thick colored outline with a tag like [C1] marks a cluster member.
+                </div>
+                <div class="legend-row">{{ graph.wallet_count }} wallets, {{ graph.tx_count }} transactions,
+                    {{ graph.flagged_count }} labeled. Drag nodes, scroll to zoom, hover for details.</div>
+            </div>
+
+            <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+             <script>
+                const data = {{ graph|tojson }};
+                const container = document.getElementById("graph");
+                const network = new vis.Network(container, {
+                    nodes: new vis.DataSet(data.nodes),
+                    edges: new vis.DataSet(data.edges)
+                }, {
+                    nodes: { font: { color: "#1e293b" } },
+                    edges: { color: "#a5b4fc", smooth: { type: "continuous" } },
+                    physics: {
+                        stabilization: { enabled: true, iterations: 250, fit: true },
+                        barnesHut: { springLength: 120, avoidOverlap: 0.2 }
+                    },
+                    interaction: { dragNodes: true, dragView: true, zoomView: true, hover: true }
+                });
+
+                // Let the graph settle once, then freeze it.
+                // After this, dragging a node moves only that node.
+                function freezeGraph() {
+                    network.setOptions({ physics: { enabled: false } });
+                }
+                network.once("stabilizationIterationsDone", freezeGraph);
+                network.once("stabilized", freezeGraph);
+                setTimeout(freezeGraph, 6000);   // safety net
+
+                // Optional: shake the layout loose again, then freeze it
+                function rearrange() {
+                    network.setOptions({ physics: { enabled: true } });
+                    network.stabilize(200);
+                    setTimeout(freezeGraph, 3500);
+                }
+            </script>
+        {% endif %}
+                {% if poisoning %}
+            <div class="risk block" style="--c: {{ '#dc2626' if poisoning.findings else '#16a34a' }}">
+                <h4>Address-poisoning check
+                    <small>{{ poisoning.checked }} counterparties compared with {{ poisoning.paid }} addresses this wallet has paid</small></h4>
+                {% if poisoning.findings %}
+                    <div class="muted">Lookalike addresses were found. This does not mean the wallet is criminal.
+                        It suggests the wallet is being <b>targeted</b>. Never copy an address from transaction history.</div>
+                    {% for f in poisoning.findings %}
+                    <div class="alert">
+                        <b style="color: {{ f.color }}">{{ f.severity }}: {{ f.title }}</b>
+                        <div class="mono" style="margin: 6px 0;">
+                            Real: {{ f.real }}<br>Lookalike: {{ f.fake }}</div>
+                        <div>{{ f.detail }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="muted">No lookalike addresses found.</div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        {% if source %}
+            <table>
+                <tr><th>Time (UTC)</th><th>From</th><th>To</th><th>Amount</th><th>Token</th><th>Tx hash</th></tr>
+                {% for t in txs %}
+                <tr>
+                    <td>{{ t.timestamp_utc }}</td>
+                    <td class="addr" title="{{ t['from'] }}">{{ t['from'][:10] }}...</td>
+                    <td class="addr" title="{{ t.to }}">{{ t.to[:10] }}...</td>
+                    <td>{{ t.value }}</td>
+                    <td><b>{{ t.token }}</b></td>
+                    <td class="addr" title="{{ t.hash }}">{{ t.hash[:12] }}...</td>
+                </tr>
+                {% endfor %}
+            </table>
+        {% endif %}
+    </div>
+</body>
+</html>

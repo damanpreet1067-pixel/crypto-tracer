@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.vscode/
+*.log
+
+# Private: never upload these
+config.py
+data/*.db
+data/*.db-journal
+data/secret.key
+exports/

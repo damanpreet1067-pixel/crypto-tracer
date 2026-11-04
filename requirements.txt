@@ -1,0 +1,7 @@
+flask
+flask-login
+bcrypt
+requests
+networkx
+reportlab
+matplotlib
